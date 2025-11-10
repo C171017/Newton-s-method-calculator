@@ -2,6 +2,8 @@
 
 A beautiful, modern web-based calculator that finds roots of mathematical functions using Newton's iterative method.
 
+🌐 **Live Website**: [https://nt.c171017.com](https://nt.c171017.com)
+
 ## Features
 
 - 🎯 **Easy to Use**: Simply enter a function, starting point, and number of iterations
@@ -64,7 +66,9 @@ The calculator:
 
 ## Getting Started
 
-Simply open `index.html` in any modern web browser. No installation or build process required!
+**🌐 Try it online**: Visit [https://nt.c171017.com](https://nt.c171017.com)
+
+Or simply open `index.html` in any modern web browser. No installation or build process required!
 
 ## Animation Features
 
