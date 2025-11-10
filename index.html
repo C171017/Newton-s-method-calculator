@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newton's Method Calculator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Newton's Method Calculator</h1>
+            <p class="subtitle">Find roots of equations using Newton's iterative method</p>
+        </header>
+
+        <div class="calculator-card">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="function">Function f(x)</label>
+                    <input 
+                        type="text" 
+                        id="function" 
+                        placeholder="e.g., x^2 - 4, sin(x) - 0.5, log(x) - 2"
+                        value="x^2 - 4">
+                    <small class="help-text">
+                        Supported: +, -, *, /, ^, sin(), cos(), tan(), log() (natural log), sqrt(), abs(), exp()
+                    </small>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="startingPoint">Starting Point (x₀)</label>
+                        <input 
+                            type="number" 
+                            id="startingPoint" 
+                            step="any" 
+                            placeholder="e.g., 1"
+                            value="1">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="iterations">Iterations</label>
+                        <input 
+                            type="number" 
+                            id="iterations" 
+                            min="1" 
+                            max="100" 
+                            placeholder="e.g., 10"
+                            value="10">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="animationSpeed">Animation Speed</label>
+                    <div class="speed-control">
+                        <input 
+                            type="range" 
+                            id="animationSpeed" 
+                            min="1" 
+                            max="3" 
+                            value="2" 
+                            step="1">
+                        <div class="speed-labels">
+                            <span>Slow</span>
+                            <span>Medium</span>
+                            <span>Fast</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="calculateBtn" class="calculate-btn">Calculate Root</button>
+            </div>
+
+            <div id="results" class="results-section hidden">
+                <h2>Results</h2>
+                <div class="result-summary">
+                    <div class="summary-item">
+                        <span class="label">Final Root:</span>
+                        <span id="finalRoot" class="value">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Final f(x):</span>
+                        <span id="finalValue" class="value">-</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Iterations Used:</span>
+                        <span id="iterationsUsed" class="value">-</span>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="iterationTable">
+                        <thead>
+                            <tr>
+                                <th>Iteration</th>
+                                <th>x<sub>n</sub></th>
+                                <th>f(x<sub>n</sub>)</th>
+                                <th>f'(x<sub>n</sub>)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="error" class="error-message hidden"></div>
+        </div>
+
+        <div class="info-section">
+            <h3>How to Use</h3>
+            <ul>
+                <li><strong>Function:</strong> Enter the function in terms of x (e.g., x^2 - 4 to find √4)</li>
+                <li><strong>Starting Point:</strong> Choose an initial guess near the root</li>
+                <li><strong>Iterations:</strong> Number of times to apply Newton's method</li>
+            </ul>
+            
+            <h3>Newton's Method Formula</h3>
+            <p class="formula">x<sub>n+1</sub> = x<sub>n</sub> - f(x<sub>n</sub>) / f'(x<sub>n</sub>)</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
