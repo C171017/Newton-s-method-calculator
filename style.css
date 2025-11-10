@@ -50,6 +50,24 @@ header h1 {
     opacity: 0.95;
 }
 
+.graph-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 2rem;
+    animation: fadeIn 0.5s ease;
+}
+
+.graph-section canvas {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
 .calculator-card {
     background: var(--card-bg);
     border-radius: 16px;
@@ -340,6 +358,95 @@ td {
     color: var(--text-primary);
 }
 
+.collapsible-section {
+    margin: 1.5rem 0;
+}
+
+.collapsible-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.3s ease;
+}
+
+.collapsible-header:hover {
+    opacity: 0.8;
+}
+
+.collapsible-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+}
+
+.toggle-icon {
+    font-size: 0.8rem;
+    color: var(--primary-color);
+    transition: transform 0.3s ease;
+    margin-left: 1rem;
+    flex-shrink: 0;
+}
+
+.collapsible-header[aria-expanded="true"] .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+}
+
+.collapsible-content.expanded {
+    max-height: 2000px;
+    opacity: 1;
+    transition: max-height 0.5s ease-in, opacity 0.4s ease-in;
+}
+
+.input-format {
+    margin: 1.5rem 0;
+    padding-top: 1rem;
+}
+
+.input-format h4 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.input-format h4:first-child {
+    margin-top: 0;
+}
+
+.input-format ul {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+}
+
+.input-format li {
+    margin-bottom: 0.5rem;
+    line-height: 1.8;
+}
+
+.input-format code {
+    background: var(--bg-color);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
 .formula {
     background: var(--bg-color);
     padding: 1rem;
@@ -390,6 +497,10 @@ td {
         font-size: 2rem;
     }
 
+    .graph-section {
+        padding: 1rem;
+    }
+
     .calculator-card {
         padding: 1.5rem;
     }
@@ -400,6 +511,32 @@ td {
 
     .result-summary {
         grid-template-columns: 1fr;
+    }
+
+    .info-section {
+        padding: 1.5rem;
+    }
+
+    .input-format h4 {
+        font-size: 0.95rem;
+        margin-top: 1.25rem;
+    }
+
+    .input-format code {
+        font-size: 0.85em;
+        padding: 0.15rem 0.3rem;
+    }
+
+    .input-format ul {
+        padding-left: 1.25rem;
+    }
+
+    .collapsible-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .toggle-icon {
+        font-size: 0.75rem;
     }
 
     th, td {

@@ -13,6 +13,10 @@
             <p class="subtitle">Find roots of equations using Newton's iterative method</p>
         </header>
 
+        <div id="graphSection" class="graph-section hidden">
+            <canvas id="graphCanvas"></canvas>
+        </div>
+
         <div class="calculator-card">
             <div class="input-section">
                 <div class="input-group">
@@ -20,10 +24,10 @@
                     <input 
                         type="text" 
                         id="function" 
-                        placeholder="e.g., x^2 - 4, sin(x) - 0.5, log(x) - 2"
+                        placeholder="e.g., x^2 - 4, sin(x) - 0.5, log(x) - 2, log(10, x) - 1"
                         value="x^2 - 4">
                     <small class="help-text">
-                        Supported: +, -, *, /, ^, sin(), cos(), tan(), log() (natural log), sqrt(), abs(), exp()
+                        Supported: +, -, *, /, ^, sin(), cos(), tan(), log() or ln() (natural log), log(b, x) (log base b), sqrt(), abs(), exp()
                     </small>
                 </div>
 
@@ -45,8 +49,8 @@
                             id="iterations" 
                             min="1" 
                             max="100" 
-                            placeholder="e.g., 10"
-                            value="10">
+                            placeholder="e.g., 5"
+                            value="5">
                     </div>
                 </div>
 
@@ -114,6 +118,56 @@
                 <li><strong>Starting Point:</strong> Choose an initial guess near the root</li>
                 <li><strong>Iterations:</strong> Number of times to apply Newton's method</li>
             </ul>
+            
+            <div class="collapsible-section">
+                <button class="collapsible-header" id="inputFormatToggle" aria-expanded="false">
+                    <h3>Accepted Input Types & Format</h3>
+                    <span class="toggle-icon">▼</span>
+                </button>
+                <div class="input-format collapsible-content" id="inputFormatContent">
+                <h4>Basic Operations:</h4>
+                <ul>
+                    <li><code>+</code> (addition), <code>-</code> (subtraction), <code>*</code> (multiplication), <code>/</code> (division)</li>
+                    <li><code>^</code> (power/exponentiation), e.g., <code>x^2</code>, <code>2^x</code></li>
+                    <li>Implicit multiplication: <code>2x</code> = <code>2*x</code>, <code>x(2+3)</code> = <code>x*(2+3)</code></li>
+                </ul>
+                
+                <h4>Trigonometric Functions:</h4>
+                <ul>
+                    <li><code>sin(x)</code> - sine</li>
+                    <li><code>cos(x)</code> - cosine</li>
+                    <li><code>tan(x)</code> - tangent</li>
+                </ul>
+                
+                <h4>Logarithmic Functions:</h4>
+                <ul>
+                    <li><code>log(x)</code> or <code>ln(x)</code> - natural logarithm (base e)</li>
+                    <li><code>log(b, x)</code> - logarithm with base b, e.g., <code>log(10, x)</code> for log₁₀(x), <code>log(2, x)</code> for log₂(x)</li>
+                </ul>
+                
+                <h4>Other Functions:</h4>
+                <ul>
+                    <li><code>sqrt(x)</code> - square root</li>
+                    <li><code>abs(x)</code> - absolute value</li>
+                    <li><code>exp(x)</code> - exponential (e^x)</li>
+                </ul>
+                
+                <h4>Constants:</h4>
+                <ul>
+                    <li><code>pi</code> or <code>PI</code> - π (3.14159...)</li>
+                    <li><code>e</code> - Euler's number (2.71828...)</li>
+                </ul>
+                
+                <h4>Examples:</h4>
+                <ul>
+                    <li><code>x^2 - 4</code> - Find square root of 4</li>
+                    <li><code>sin(x) - 0.5</code> - Find where sin(x) = 0.5</li>
+                    <li><code>log(10, x) - 2</code> - Find where log₁₀(x) = 2</li>
+                    <li><code>log(2, x^2) - 3</code> - Find where log₂(x²) = 3</li>
+                    <li><code>x^3 - 2*x + 2</code> - Cubic equation</li>
+                </ul>
+                </div>
+            </div>
             
             <h3>Newton's Method Formula</h3>
             <p class="formula">x<sub>n+1</sub> = x<sub>n</sub> - f(x<sub>n</sub>) / f'(x<sub>n</sub>)</p>
