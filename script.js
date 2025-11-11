@@ -560,7 +560,7 @@ class NewtonCalculator {
             expression = expression
                 .replace(/\^/g, '**')  // Power operator
                 .replace(/ln\(/g, 'Math.log(')   // Natural logarithm (do ln first)
-                .replace(/log\(/g, 'Math.log(')  // Natural logarithm (single argument)
+                .replace(/(?<!Math\.)log\(/g, 'Math.log(')  // Natural logarithm (single argument) - but not if already Math.log
                 .replace(/sin\(/g, 'Math.sin(')
                 .replace(/cos\(/g, 'Math.cos(')
                 .replace(/tan\(/g, 'Math.tan(')
@@ -571,6 +571,46 @@ class NewtonCalculator {
                 .replace(/e(?![a-z])/gi, 'Math.E');
 
             // Handle implicit multiplication
+            // First, protect function calls from being modified
+            // Store function calls temporarily with placeholders to handle nested parentheses
+            const functionCallPlaceholders = [];
+            
+            // Replace Math.xxx(...) patterns with placeholders, handling nested parentheses
+            let funcCallRegex = /Math\.\w+\(/g;
+            let funcMatch;
+            const funcCalls = [];
+            
+            // Find all function calls and their positions
+            while ((funcMatch = funcCallRegex.exec(expression)) !== null) {
+                const startPos = funcMatch.index;
+                let pos = funcMatch.index + funcMatch[0].length;
+                let depth = 1;
+                let funcCall = funcMatch[0];
+                
+                // Find the matching closing parenthesis
+                while (pos < expression.length && depth > 0) {
+                    const char = expression[pos];
+                    funcCall += char;
+                    if (char === '(') depth++;
+                    else if (char === ')') depth--;
+                    pos++;
+                }
+                
+                if (depth === 0) {
+                    funcCalls.push({ start: startPos, end: pos, content: funcCall });
+                }
+            }
+            
+            // Replace function calls with placeholders (from right to left to preserve indices)
+            funcCalls.sort((a, b) => b.start - a.start);
+            funcCalls.forEach((funcCall, index) => {
+                const placeholder = `__FUNC${index}__`;
+                functionCallPlaceholders[index] = funcCall.content;
+                expression = expression.substring(0, funcCall.start) + 
+                         placeholder + 
+                         expression.substring(funcCall.end);
+            });
+            
             // Number followed by x: 2x -> 2*x
             expression = expression.replace(/(\d)([x])/g, '$1*$2');
             // x followed by number: x2 -> x*2
@@ -579,6 +619,11 @@ class NewtonCalculator {
             expression = expression.replace(/(\d|x)(\()/g, '$1*$2');
             // Closing parenthesis followed by number/x/opening parenthesis: )2 or )x or )( -> )*2 or )*x or )*(
             expression = expression.replace(/(\))(\d|x|\()/g, '$1*$2');
+            
+            // Restore function calls (from right to left to preserve indices)
+            for (let i = functionCallPlaceholders.length - 1; i >= 0; i--) {
+                expression = expression.replace(`__FUNC${i}__`, functionCallPlaceholders[i]);
+            }
             
             // Replace x with the actual value
             // Use word boundaries to avoid replacing x in exp, etc.
@@ -654,10 +699,9 @@ class NewtonCalculator {
     // Format number for display
     formatNumber(num, decimals = 10) {
         if (Math.abs(num) < 1e-10) return '0';
-        if (Math.abs(num) > 1e10 || Math.abs(num) < 1e-4) {
-            return num.toExponential(6);
-        }
-        return num.toFixed(decimals).replace(/\.?0+$/, '');
+        // Always format with fixed decimal places, limit to 10 decimal points
+        const rounded = Number(num.toFixed(decimals));
+        return rounded.toString();
     }
 
     // Display results in table with animation
