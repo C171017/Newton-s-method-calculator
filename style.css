@@ -316,6 +316,17 @@ td {
     font-family: 'Courier New', monospace;
 }
 
+tbody tr.error-row {
+    background-color: #fee2e2;
+    color: var(--error-color);
+    border-left: 4px solid var(--error-color);
+}
+
+tbody tr.error-row td {
+    color: var(--error-color);
+    font-weight: 500;
+}
+
 .error-message {
     background: #fee2e2;
     color: var(--error-color);

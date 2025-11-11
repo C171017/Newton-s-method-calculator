@@ -42,10 +42,20 @@ class GraphRenderer {
         let xValues = [x0];
         let yValues = [0]; // x-axis
         
-        // Collect all x values from iterations
-        results.forEach(r => {
+        // Collect all x values from iterations and their x-axis intersections
+        results.forEach((r, index) => {
             xValues.push(r.x);
             yValues.push(r.fx);
+            
+            // Calculate x-axis intersection point (where tangent line crosses x-axis)
+            // This is: x - f(x) / f'(x), which is the next x in Newton's method
+            if (isFinite(r.fx) && isFinite(r.fpx) && Math.abs(r.fpx) > 1e-10) {
+                const xIntersect = r.x - r.fx / r.fpx;
+                if (isFinite(xIntersect)) {
+                    xValues.push(xIntersect);
+                    yValues.push(0); // x-axis intersection is always at y=0
+                }
+            }
         });
         
         // Sample function to find range
@@ -647,53 +657,106 @@ class NewtonCalculator {
 
     // Numerical derivative using central difference method
     derivative(funcStr, x, h = 1e-7) {
-        const f_plus = this.parseFunction(funcStr, x + h);
-        const f_minus = this.parseFunction(funcStr, x - h);
-        const deriv = (f_plus - f_minus) / (2 * h);
-        // Round to 10 decimal points
-        return Math.round(deriv * 1e10) / 1e10;
+        try {
+            const f_plus = this.parseFunction(funcStr, x + h);
+            const f_minus = this.parseFunction(funcStr, x - h);
+            
+            // Check if values are finite
+            if (!isFinite(f_plus) || !isFinite(f_minus)) {
+                return NaN;
+            }
+            
+            const deriv = (f_plus - f_minus) / (2 * h);
+            
+            // Check if derivative is finite
+            if (!isFinite(deriv)) {
+                return NaN;
+            }
+            
+            // Round to 10 decimal points
+            return Math.round(deriv * 1e10) / 1e10;
+        } catch (error) {
+            // If calculation fails, return NaN
+            return NaN;
+        }
     }
 
     // Newton's Method implementation
     newtonsMethod(funcStr, x0, maxIterations) {
         const results = [];
         let x = x0;
+        let error = null;
 
         for (let i = 0; i <= maxIterations; i++) {
-            const fx = this.parseFunction(funcStr, x);
-            const fpx = this.derivative(funcStr, x);
+            try {
+                const fx = this.parseFunction(funcStr, x);
+                const fpx = this.derivative(funcStr, x);
 
-            results.push({
-                iteration: i,
-                x: x,
-                fx: fx,
-                fpx: fpx
-            });
+                // Check if values are finite
+                if (!isFinite(fx) || !isFinite(fpx)) {
+                    error = 'Function or derivative is not finite (infinity or undefined)';
+                    results.push({
+                        iteration: i,
+                        x: x,
+                        fx: fx,
+                        fpx: fpx,
+                        error: error
+                    });
+                    break;
+                }
 
-            // Check if derivative is too close to zero
-            if (Math.abs(fpx) < 1e-10) {
-                throw new Error('Derivative too close to zero. Try a different starting point.');
-            }
+                results.push({
+                    iteration: i,
+                    x: x,
+                    fx: fx,
+                    fpx: fpx
+                });
 
-            // Check for convergence
-            if (Math.abs(fx) < 1e-10 && i > 0) {
+                // Check if derivative is too close to zero
+                if (Math.abs(fpx) < 1e-10) {
+                    error = 'Derivative too close to zero. Try a different starting point.';
+                    results[results.length - 1].error = error;
+                    break;
+                }
+
+                // Check for convergence
+                if (Math.abs(fx) < 1e-10 && i > 0) {
+                    break;
+                }
+
+                // Newton's method formula: x_n+1 = x_n - f(x_n) / f'(x_n)
+                if (i < maxIterations) {
+                    x = x - fx / fpx;
+                    // Round to 10 decimal points to avoid floating point errors
+                    x = Math.round(x * 1e10) / 1e10;
+                    
+                    // Check for NaN or Infinity
+                    if (!isFinite(x)) {
+                        error = 'Calculation diverged. Try a different starting point.';
+                        results[results.length - 1].error = error;
+                        break;
+                    }
+                }
+            } catch (err) {
+                // Catch any errors during calculation
+                error = err.message || 'Error during calculation';
+                // Try to add the current iteration with error, even if we couldn't calculate fx/fpx
+                try {
+                    results.push({
+                        iteration: i,
+                        x: x,
+                        fx: NaN,
+                        fpx: NaN,
+                        error: error
+                    });
+                } catch {
+                    // If we can't even add the result, just break
+                }
                 break;
-            }
-
-            // Newton's method formula: x_n+1 = x_n - f(x_n) / f'(x_n)
-            if (i < maxIterations) {
-                x = x - fx / fpx;
-                // Round to 10 decimal points to avoid floating point errors
-                x = Math.round(x * 1e10) / 1e10;
-            }
-
-            // Check for NaN or Infinity
-            if (!isFinite(x)) {
-                throw new Error('Calculation diverged. Try a different starting point.');
             }
         }
 
-        return results;
+        return { results, error };
     }
 
     // Format number for display
@@ -705,7 +768,7 @@ class NewtonCalculator {
     }
 
     // Display results in table with animation
-    async displayResults(results, funcStr, x0) {
+    async displayResults(results, funcStr, x0, error = null) {
         // Clear previous results
         this.tableBody.innerHTML = '';
         
@@ -723,11 +786,13 @@ class NewtonCalculator {
         const speedSetting = parseInt(this.animationSpeedInput.value);
         const speedMultiplier = speedSetting === 1 ? 1.5 : speedSetting === 2 ? 1 : 0.4;
         
-        // Calculate graph bounds
-        this.graphRenderer.calculateBounds(funcStr, x0, results.length, results);
-        
-        // Draw initial graph setup (grid, axes, function)
-        this.graphRenderer.drawSetup(funcStr);
+        // Calculate graph bounds (only for valid results)
+        const validResults = results.filter(r => !r.error && isFinite(r.fx) && isFinite(r.fpx));
+        if (validResults.length > 0) {
+            this.graphRenderer.calculateBounds(funcStr, x0, results.length, validResults);
+            // Draw initial graph setup (grid, axes, function)
+            this.graphRenderer.drawSetup(funcStr);
+        }
         
         // Wait a bit for graph to render
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -738,32 +803,47 @@ class NewtonCalculator {
 
         // Animate each iteration on graph and table simultaneously
         for (let i = 0; i < results.length; i++) {
-            // Redraw base graph (grid, axes, function) and previous iterations
-            this.graphRenderer.drawSetup(funcStr);
-            if (i > 0) {
-                this.graphRenderer.drawAllIterations(results, funcStr, i, this.parseFunction.bind(this), this.derivative.bind(this));
+            const result = results[i];
+            const isErrorRow = result.error || !isFinite(result.fx) || !isFinite(result.fpx);
+            
+            // Only animate graph for valid iterations
+            if (!isErrorRow && validResults.length > 0) {
+                // Redraw base graph (grid, axes, function) and previous iterations
+                this.graphRenderer.drawSetup(funcStr);
+                if (i > 0) {
+                    const previousValid = results.slice(0, i).filter(r => !r.error && isFinite(r.fx) && isFinite(r.fpx));
+                    if (previousValid.length > 0) {
+                        this.graphRenderer.drawAllIterations(previousValid, funcStr, previousValid.length, this.parseFunction.bind(this), this.derivative.bind(this));
+                    }
+                }
+                
+                // Animate current iteration on graph
+                const graphAnimation = this.graphRenderer.animateIteration(
+                    i, 
+                    result, 
+                    funcStr, 
+                    speedMultiplier,
+                    this.parseFunction.bind(this),
+                    this.derivative.bind(this)
+                );
+                
+                // Animate table row
+                const tableAnimation = this.animateRow(result, baseDelay, isErrorRow);
+                
+                // Wait for both animations to complete
+                await Promise.all([graphAnimation, tableAnimation]);
+            } else {
+                // For error rows, just animate the table row
+                const tableAnimation = this.animateRow(result, baseDelay, isErrorRow);
+                await tableAnimation;
             }
-            
-            // Animate current iteration on graph
-            const graphAnimation = this.graphRenderer.animateIteration(
-                i, 
-                results[i], 
-                funcStr, 
-                speedMultiplier,
-                this.parseFunction.bind(this),
-                this.derivative.bind(this)
-            );
-            
-            // Animate table row
-            const tableAnimation = this.animateRow(results[i], baseDelay);
-            
-            // Wait for both animations to complete
-            await Promise.all([graphAnimation, tableAnimation]);
         }
         
-        // Draw final state with all iterations
-        this.graphRenderer.drawSetup(funcStr);
-        this.graphRenderer.drawAllIterations(results, funcStr, results.length, this.parseFunction.bind(this), this.derivative.bind(this));
+        // Draw final state with all valid iterations
+        if (validResults.length > 0) {
+            this.graphRenderer.drawSetup(funcStr);
+            this.graphRenderer.drawAllIterations(validResults, funcStr, validResults.length, this.parseFunction.bind(this), this.derivative.bind(this));
+        }
 
         // Display final summary with animation
         const lastResult = results[results.length - 1];
@@ -773,9 +853,16 @@ class NewtonCalculator {
         this.finalValueSpan.classList.add('animate-value');
         this.iterationsUsedSpan.classList.add('animate-value');
         
-        this.finalRootSpan.textContent = this.formatNumber(lastResult.x);
-        this.finalValueSpan.textContent = this.formatNumber(lastResult.fx);
-        this.iterationsUsedSpan.textContent = results.length - 1;
+        // Show error in final result if there was an error
+        if (error || lastResult.error) {
+            this.finalRootSpan.textContent = 'Error';
+            this.finalValueSpan.textContent = error || lastResult.error || 'Error occurred';
+            this.iterationsUsedSpan.textContent = results.length - 1;
+        } else {
+            this.finalRootSpan.textContent = this.formatNumber(lastResult.x);
+            this.finalValueSpan.textContent = this.formatNumber(lastResult.fx);
+            this.iterationsUsedSpan.textContent = results.length - 1;
+        }
         
         // Remove animation class after animation completes
         setTimeout(() => {
@@ -786,16 +873,28 @@ class NewtonCalculator {
     }
 
     // Animate a single row
-    animateRow(result, delay) {
+    animateRow(result, delay, isErrorRow = false) {
         return new Promise(resolve => {
             setTimeout(() => {
                 const row = document.createElement('tr');
                 row.classList.add('animate-row');
+                if (isErrorRow) {
+                    row.classList.add('error-row');
+                }
+                
+                // Format values, showing "Error" or "NaN" for invalid values
+                const formatValue = (val) => {
+                    if (!isFinite(val)) {
+                        return isErrorRow ? 'Error' : 'NaN';
+                    }
+                    return this.formatNumber(val);
+                };
+                
                 row.innerHTML = `
                     <td>${result.iteration}</td>
-                    <td>${this.formatNumber(result.x)}</td>
-                    <td>${this.formatNumber(result.fx)}</td>
-                    <td>${this.formatNumber(result.fpx)}</td>
+                    <td>${formatValue(result.x)}</td>
+                    <td>${formatValue(result.fx)}</td>
+                    <td>${formatValue(result.fpx)}</td>
                 `;
                 this.tableBody.appendChild(row);
                 
@@ -854,10 +953,10 @@ class NewtonCalculator {
             this.graphSection.classList.add('hidden');
 
             // Perform Newton's method
-            const results = this.newtonsMethod(funcStr, x0, iterations);
+            const { results, error } = this.newtonsMethod(funcStr, x0, iterations);
 
-            // Display results with animation (pass funcStr and x0 for graph)
-            await this.displayResults(results, funcStr, x0);
+            // Display results with animation (pass funcStr and x0 for graph, and error if any)
+            await this.displayResults(results, funcStr, x0, error);
 
             // Re-enable button
             this.calculateBtn.disabled = false;
