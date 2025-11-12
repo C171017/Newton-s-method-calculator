@@ -656,8 +656,510 @@ class NewtonCalculator {
         }
     }
 
-    // Numerical derivative using central difference method
+    // Symbolic differentiation - returns the derivative as a function string
+    symbolicDerivative(funcStr) {
+        try {
+            let expr = funcStr.trim().replace(/\s+/g, '');
+            console.log('Symbolic diff input:', expr);
+            
+            // Handle implicit multiplication (same as parseFunction)
+            // Number followed by x: 2x -> 2*x
+            expr = expr.replace(/(\d)([x])/g, '$1*$2');
+            // x followed by number: x2 -> x*2
+            expr = expr.replace(/([x])(\d)/g, '$1*$2');
+            // Number/x followed by opening parenthesis: 2( or x( -> 2*( or x*(
+            expr = expr.replace(/(\d|x)(\()/g, '$1*$2');
+            // Closing parenthesis followed by number/x/opening parenthesis: )2 or )x or )( -> )*2 or )*x or )*(
+            // But protect function calls first
+            const functionCallPlaceholders = [];
+            let funcCallRegex = /(sin|cos|tan|ln|log|sqrt|abs|exp)\(/g;
+            let funcMatch;
+            const funcCalls = [];
+            
+            while ((funcMatch = funcCallRegex.exec(expr)) !== null) {
+                const startPos = funcMatch.index;
+                let pos = funcMatch.index + funcMatch[0].length;
+                let depth = 1;
+                let funcCall = funcMatch[0];
+                
+                while (pos < expr.length && depth > 0) {
+                    const char = expr[pos];
+                    funcCall += char;
+                    if (char === '(') depth++;
+                    else if (char === ')') depth--;
+                    pos++;
+                }
+                
+                if (depth === 0) {
+                    funcCalls.push({ start: startPos, end: pos, content: funcCall });
+                }
+            }
+            
+            funcCalls.sort((a, b) => b.start - a.start);
+            funcCalls.forEach((funcCall, index) => {
+                const placeholder = `__FUNC${index}__`;
+                functionCallPlaceholders[index] = funcCall.content;
+                expr = expr.substring(0, funcCall.start) + 
+                     placeholder + 
+                     expr.substring(funcCall.end);
+            });
+            
+            expr = expr.replace(/(\))(\d|x|\()/g, '$1*$2');
+            
+            for (let i = functionCallPlaceholders.length - 1; i >= 0; i--) {
+                expr = expr.replace(`__FUNC${i}__`, functionCallPlaceholders[i]);
+            }
+            
+            // Helper function to wrap expression in parentheses if needed
+            const wrap = (str) => {
+                // Check if already wrapped or is a simple term
+                if (str.match(/^\(.+\)$/) || str.match(/^[\d.x]+$/) || str.match(/^Math\.\w+\(/)) {
+                    return str;
+                }
+                return `(${str})`;
+            };
+            
+            // Helper to differentiate a term
+            const diffTerm = (term) => {
+                term = term.trim();
+                
+                // Constant
+                if (term.match(/^-?\d+\.?\d*$/)) {
+                    return '0';
+                }
+                
+                // x
+                if (term === 'x') {
+                    return '1';
+                }
+                
+                // -x
+                if (term === '-x') {
+                    return '-1';
+                }
+                
+                // x^n
+                const powerMatch = term.match(/^x\^(\d+\.?\d*)$/);
+                if (powerMatch) {
+                    const n = parseFloat(powerMatch[1]);
+                    if (n === 1) return '1';
+                    if (n === 2) return '2*x';
+                    return `${n}*x^${n - 1}`;
+                }
+                
+                // -x^n
+                const negPowerMatch = term.match(/^-x\^(\d+\.?\d*)$/);
+                if (negPowerMatch) {
+                    const n = parseFloat(negPowerMatch[1]);
+                    if (n === 1) return '-1';
+                    if (n === 2) return '-2*x';
+                    return `-${n}*x^${n - 1}`;
+                }
+                
+                // c*x^n where c is constant (handles both positive and negative)
+                const constPowerMatch = term.match(/^(-?\d+\.?\d*)\*x\^(\d+\.?\d*)$/);
+                if (constPowerMatch) {
+                    const c = parseFloat(constPowerMatch[1]);
+                    const n = parseFloat(constPowerMatch[2]);
+                    const newC = c * n;
+                    if (n === 0) return '0';
+                    if (n === 1) {
+                        // Format negative numbers properly
+                        return newC < 0 ? `${newC}` : `${newC}`;
+                    }
+                    if (n === 2) {
+                        return newC < 0 ? `${newC}*x` : `${newC}*x`;
+                    }
+                    return newC < 0 ? `${newC}*x^${n - 1}` : `${newC}*x^${n - 1}`;
+                }
+                
+                // c*x where c is constant (handles both positive and negative)
+                const constXMatch = term.match(/^(-?\d+\.?\d*)\*x$/);
+                if (constXMatch) {
+                    return constXMatch[1];
+                }
+                
+                // sin(x)
+                if (term === 'sin(x)') {
+                    return 'cos(x)';
+                }
+                const sinMatch = term.match(/^sin\((.*)\)$/);
+                if (sinMatch) {
+                    const inner = sinMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `cos(${inner})`;
+                    }
+                    return `cos(${inner})*${wrap(innerDiff)}`;
+                }
+                
+                // cos(x)
+                if (term === 'cos(x)') {
+                    return '-sin(x)';
+                }
+                const cosMatch = term.match(/^cos\((.*)\)$/);
+                if (cosMatch) {
+                    const inner = cosMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `-sin(${inner})`;
+                    }
+                    return `-sin(${inner})*${wrap(innerDiff)}`;
+                }
+                
+                // tan(x)
+                if (term === 'tan(x)') {
+                    return '1/(cos(x)^2)';
+                }
+                const tanMatch = term.match(/^tan\((.*)\)$/);
+                if (tanMatch) {
+                    const inner = tanMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `1/(cos(${inner})^2)`;
+                    }
+                    return `1/(cos(${inner})^2)*${wrap(innerDiff)}`;
+                }
+                
+                // ln(x) or log(x)
+                if (term === 'ln(x)' || term === 'log(x)') {
+                    return '1/x';
+                }
+                const lnMatch = term.match(/^(ln|log)\((.*)\)$/);
+                if (lnMatch) {
+                    const inner = lnMatch[2];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `1/${wrap(inner)}`;
+                    }
+                    return `${wrap(innerDiff)}/${wrap(inner)}`;
+                }
+                
+                // sqrt(x)
+                if (term === 'sqrt(x)') {
+                    return '1/(2*sqrt(x))';
+                }
+                const sqrtMatch = term.match(/^sqrt\((.*)\)$/);
+                if (sqrtMatch) {
+                    const inner = sqrtMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `1/(2*sqrt(${inner}))`;
+                    }
+                    return `${wrap(innerDiff)}/(2*sqrt(${inner}))`;
+                }
+                
+                // abs(x) - derivative is sign(x) = x/abs(x)
+                if (term === 'abs(x)') {
+                    return 'x/abs(x)';
+                }
+                const absMatch = term.match(/^abs\((.*)\)$/);
+                if (absMatch) {
+                    const inner = absMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `${inner}/abs(${inner})`;
+                    }
+                    return `${wrap(innerDiff)}*${inner}/abs(${inner})`;
+                }
+                
+                // exp(x)
+                if (term === 'exp(x)') {
+                    return 'exp(x)';
+                }
+                const expMatch = term.match(/^exp\((.*)\)$/);
+                if (expMatch) {
+                    const inner = expMatch[1];
+                    const innerDiff = this.symbolicDerivative(inner);
+                    if (innerDiff === '1') {
+                        return `exp(${inner})`;
+                    }
+                    return `exp(${inner})*${wrap(innerDiff)}`;
+                }
+                
+                // e^x (handled as exp(x) in our parser)
+                if (term === 'e^x' || term.match(/^e\^x$/)) {
+                    return 'e^x';
+                }
+                
+                // If term doesn't match simple patterns, try recursive differentiation
+                // This handles complex nested expressions
+                const recursiveResult = diffPower(term);
+                if (recursiveResult !== null) {
+                    return recursiveResult;
+                }
+                
+                return null; // Unknown term
+            };
+            
+            // Handle addition and subtraction
+            const diffSum = (expr) => {
+                console.log('diffSum called with:', expr);
+                // Handle leading negative sign
+                let sign = 1;
+                if (expr.startsWith('-')) {
+                    sign = -1;
+                    expr = expr.substring(1);
+                }
+                
+                // Split by + and - but preserve them
+                const terms = [];
+                let current = '';
+                let depth = 0;
+                let termSign = sign;
+                
+                for (let i = 0; i < expr.length; i++) {
+                    const char = expr[i];
+                    if (char === '(') depth++;
+                    else if (char === ')') depth--;
+                    else if ((char === '+' || char === '-') && depth === 0) {
+                        if (current) {
+                            terms.push({ term: current.trim(), sign: termSign });
+                            current = '';
+                        }
+                        termSign = char === '+' ? 1 : -1;
+                        continue;
+                    }
+                    current += char;
+                }
+                if (current) {
+                    terms.push({ term: current.trim(), sign: termSign });
+                }
+                
+                console.log('diffSum terms:', terms);
+                
+                if (terms.length === 0) return '0';
+                if (terms.length === 1) {
+                    const diff = diffTerm(terms[0].term);
+                    console.log('diffSum single term diff:', diff);
+                    if (terms[0].sign === -1) {
+                        return diff === '0' ? '0' : `-${wrap(diff)}`;
+                    }
+                    return diff;
+                }
+                
+                const derivatives = terms.map(t => {
+                    let diff = diffTerm(t.term);
+                    console.log(`diffSum term "${t.term}" (sign ${t.sign}) -> diff:`, diff);
+                    if (diff === null) {
+                        // Try recursive differentiation on the whole term
+                        diff = diffPower(t.term);
+                        console.log(`diffSum recursive diff for "${t.term}":`, diff);
+                        if (diff === null) return null;
+                    }
+                    if (diff === '0') return null;
+                    if (t.sign === -1) {
+                        return `-${wrap(diff)}`;
+                    }
+                    return diff;
+                }).filter(d => d !== null);
+                
+                console.log('diffSum derivatives:', derivatives);
+                
+                if (derivatives.length === 0) return '0';
+                if (derivatives.length === 1) return derivatives[0];
+                return derivatives.join('+').replace(/\+\-/g, '-');
+            };
+            
+            // Handle multiplication (product rule)
+            const diffProduct = (expr) => {
+                // Check if it's a product
+                const factors = [];
+                let current = '';
+                let depth = 0;
+                
+                for (let i = 0; i < expr.length; i++) {
+                    const char = expr[i];
+                    if (char === '(') depth++;
+                    else if (char === ')') depth--;
+                    else if (char === '*' && depth === 0 && current) {
+                        factors.push(current.trim());
+                        current = '';
+                        continue;
+                    }
+                    current += char;
+                }
+                if (current) {
+                    factors.push(current.trim());
+                }
+                
+                if (factors.length === 1) {
+                    // Not a product, try sum/difference
+                    return diffSum(factors[0]);
+                }
+                
+                // Product rule: (f*g)' = f'*g + f*g'
+                const derivatives = [];
+                for (let i = 0; i < factors.length; i++) {
+                    const f = factors[i];
+                    const fPrime = diffTerm(f);
+                    if (fPrime === '0') continue;
+                    
+                    const otherFactors = [...factors];
+                    otherFactors.splice(i, 1);
+                    const otherProduct = otherFactors.join('*');
+                    
+                    if (fPrime === '1') {
+                        derivatives.push(otherProduct);
+                    } else {
+                        derivatives.push(`${wrap(fPrime)}*${otherProduct}`);
+                    }
+                }
+                
+                if (derivatives.length === 0) return '0';
+                if (derivatives.length === 1) return derivatives[0];
+                return derivatives.join('+');
+            };
+            
+            // Handle division (quotient rule)
+            const diffQuotient = (expr) => {
+                const divMatch = expr.match(/^(.+)\/(.+)$/);
+                if (!divMatch) {
+                    return diffProduct(expr);
+                }
+                
+                const num = divMatch[1].trim();
+                const den = divMatch[2].trim();
+                
+                const numPrime = diffTerm(num);
+                const denPrime = diffTerm(den);
+                
+                // Quotient rule: (f/g)' = (f'*g - f*g')/g^2
+                if (numPrime === '0' && denPrime === '0') {
+                    return '0';
+                }
+                if (numPrime === '0') {
+                    return `-${wrap(num)}*${wrap(denPrime)}/${wrap(den)}^2`;
+                }
+                if (denPrime === '0') {
+                    return `${wrap(numPrime)}/${wrap(den)}`;
+                }
+                
+                return `(${wrap(numPrime)}*${wrap(den)}-${wrap(num)}*${wrap(denPrime)})/${wrap(den)}^2`;
+            };
+            
+            // Handle power (chain rule for x^f(x) or f(x)^g(x))
+            // Power has higher precedence than +, -, *, /, so we need to find the rightmost ^ at top level
+            const diffPower = (expr) => {
+                // Find the rightmost ^ that's not inside parentheses
+                let powerIndex = -1;
+                let depth = 0;
+                for (let i = expr.length - 1; i >= 0; i--) {
+                    const char = expr[i];
+                    if (char === ')') depth++;
+                    else if (char === '(') depth--;
+                    else if (char === '^' && depth === 0) {
+                        powerIndex = i;
+                        break;
+                    }
+                }
+                
+                if (powerIndex === -1) {
+                    // No power operator at top level, try quotient
+                    return diffQuotient(expr);
+                }
+                
+                const base = expr.substring(0, powerIndex).trim();
+                const exponent = expr.substring(powerIndex + 1).trim();
+                
+                // x^n where n is constant
+                if (base === 'x' && exponent.match(/^\d+\.?\d*$/)) {
+                    const n = parseFloat(exponent);
+                    if (n === 0) return '0';
+                    if (n === 1) return '1';
+                    if (n === 2) return '2*x';
+                    return `${n}*x^${n - 1}`;
+                }
+                
+                // f(x)^n where n is constant - use chain rule
+                if (exponent.match(/^\d+\.?\d*$/)) {
+                    const n = parseFloat(exponent);
+                    const basePrime = diffTerm(base);
+                    if (basePrime === null || basePrime === '0') return '0';
+                    if (n === 0) return '0';
+                    if (n === 1) return basePrime;
+                    if (basePrime === '1') {
+                        return `${n}*${wrap(base)}^${n - 1}`;
+                    }
+                    return `${n}*${wrap(base)}^${n - 1}*${wrap(basePrime)}`;
+                }
+                
+                // General case: f(x)^g(x) - complex, use numerical for now
+                // For now, fall back to numerical differentiation for complex powers
+                return null;
+            };
+            
+            // Main differentiation logic
+            // Check operator precedence: + and - have lowest precedence, so check them first
+            // If there are + or - at top level, it's a sum/difference
+            let hasTopLevelSum = false;
+            let depth = 0;
+            for (let i = 0; i < expr.length; i++) {
+                const char = expr[i];
+                if (char === '(') depth++;
+                else if (char === ')') depth--;
+                else if ((char === '+' || char === '-') && depth === 0 && i > 0) {
+                    hasTopLevelSum = true;
+                    break;
+                }
+            }
+            
+            let result;
+            if (hasTopLevelSum) {
+                // It's a sum/difference - handle that first
+                result = diffSum(expr);
+            } else {
+                // Try power first, then quotient, then product, then sum
+                result = diffPower(expr);
+            }
+            
+            if (result === null) {
+                // Fall back to numerical if symbolic fails
+                return null;
+            }
+            
+            // Simplify: remove unnecessary parentheses and combine terms
+            result = result
+                .replace(/\(0\)/g, '0')
+                .replace(/\*1\b/g, '')
+                .replace(/\b1\*/g, '')
+                .replace(/\+0\b/g, '')
+                .replace(/\b0\+/g, '')
+                .replace(/^0\+/, '')
+                .replace(/\+0$/, '')
+                .replace(/\+\-/g, '-')  // Replace +- with -
+                .replace(/\-\+/g, '-')  // Replace -+ with -
+                .replace(/^\+/, '')     // Remove leading +
+                .replace(/\(([^()]+)\)/g, '$1'); // Remove unnecessary parentheses around simple terms (be careful with this)
+            
+            console.log('Symbolic derivative final result:', result);
+            return result;
+        } catch (error) {
+            // If symbolic differentiation fails, return null to fall back to numerical
+            return null;
+        }
+    }
+
+    // Derivative - tries symbolic first, falls back to numerical
     derivative(funcStr, x, h = 1e-7) {
+        // Try symbolic differentiation first
+        const symbolicDeriv = this.symbolicDerivative(funcStr);
+        console.log('Symbolic derivative result:', symbolicDeriv);
+        if (symbolicDeriv !== null) {
+            try {
+                // Evaluate the symbolic derivative at x
+                const result = this.parseFunction(symbolicDeriv, x);
+                console.log('Evaluated symbolic derivative at x=' + x + ':', result);
+                return result;
+            } catch (error) {
+                console.log('Error evaluating symbolic derivative:', error);
+                // If evaluation fails, fall back to numerical
+            }
+        } else {
+            console.log('Symbolic differentiation returned null, using numerical');
+        }
+        
+        // Fall back to numerical derivative using central difference method
         try {
             const f_plus = this.parseFunction(funcStr, x + h);
             const f_minus = this.parseFunction(funcStr, x - h);
