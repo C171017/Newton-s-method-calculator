@@ -5,11 +5,23 @@ class GraphRenderer {
         this.ctx = this.canvas.getContext('2d');
         this.parseFunction = parseFunction;
         
-        // Set canvas size
+        // Get device pixel ratio for high-DPI displays (Retina, etc.)
+        this.dpr = window.devicePixelRatio || 1;
+        
+        // Set logical canvas size (display size)
         this.width = 800;
         this.height = 600;
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
+        
+        // Set actual canvas size (internal resolution) - higher for crisp rendering
+        this.canvas.width = this.width * this.dpr;
+        this.canvas.height = this.height * this.dpr;
+        
+        // Scale context to match device pixel ratio
+        this.ctx.scale(this.dpr, this.dpr);
+        
+        // Set CSS size to logical size (so it displays at the same size)
+        this.canvas.style.width = this.width + 'px';
+        this.canvas.style.height = this.height + 'px';
         
         // Padding for axis labels
         this.padding = 60;
@@ -247,8 +259,8 @@ class GraphRenderer {
                 const duration = 400; // ms
                 const startTime = performance.now();
                 
-                // Store the base image before animation
-                const baseImage = this.ctx.getImageData(0, 0, this.width, this.height);
+                // Store the base image before animation (use device pixel coordinates)
+                const baseImage = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
                 
                 const animate = (currentTime) => {
                     // Restore base image
@@ -286,17 +298,9 @@ class GraphRenderer {
             // x_int = x - f(x) / f'(x)
             const xIntersect = x - fx / fpx;
             
-            // Extend line beyond visible area for better visualization
+            // Draw line from point on function to x-axis intersection (no extension/tail)
             const pointOnFunction = this.worldToCanvas(x, fx);
             const pointOnAxis = this.worldToCanvas(xIntersect, 0);
-            
-            // Extend line
-            const dx = pointOnAxis.x - pointOnFunction.x;
-            const dy = pointOnAxis.y - pointOnFunction.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            const extend = 50;
-            const endX = pointOnFunction.x + (dx / length) * (length + extend);
-            const endY = pointOnFunction.y + (dy / length) * (length + extend);
             
             if (!animated) {
                 this.ctx.strokeStyle = color;
@@ -304,7 +308,7 @@ class GraphRenderer {
                 this.ctx.setLineDash([5, 5]);
                 this.ctx.beginPath();
                 this.ctx.moveTo(pointOnFunction.x, pointOnFunction.y);
-                this.ctx.lineTo(endX, endY);
+                this.ctx.lineTo(pointOnAxis.x, pointOnAxis.y);
                 this.ctx.stroke();
                 this.ctx.setLineDash([]);
                 resolve();
@@ -312,8 +316,8 @@ class GraphRenderer {
                 const duration = 500; // ms
                 const startTime = performance.now();
                 
-                // Store the base image before animation
-                const baseImage = this.ctx.getImageData(0, 0, this.width, this.height);
+                // Store the base image before animation (use device pixel coordinates)
+                const baseImage = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
                 
                 const animate = (currentTime) => {
                     // Restore base image
@@ -321,8 +325,9 @@ class GraphRenderer {
                     
                     const elapsed = currentTime - startTime;
                     const progress = Math.min(elapsed / duration, 1);
-                    const currentX = pointOnFunction.x + (endX - pointOnFunction.x) * progress;
-                    const currentY = pointOnFunction.y + (endY - pointOnFunction.y) * progress;
+                    // Animate from point on function to x-axis intersection (no tail)
+                    const currentX = pointOnFunction.x + (pointOnAxis.x - pointOnFunction.x) * progress;
+                    const currentY = pointOnFunction.y + (pointOnAxis.y - pointOnFunction.y) * progress;
                     
                     // Draw animated line
                     this.ctx.strokeStyle = color;
@@ -394,8 +399,8 @@ class GraphRenderer {
         // Calculate next x (intersection of tangent with x-axis)
         const nextX = x - fx / fpx;
         
-        // Step 1: Draw vertical line from x-axis to function (animated)
-        await this.drawVerticalLine(x, 0, fx, this.colors.current, 2, true);
+        // Step 1: Draw vertical line from x-axis to function (animated, thicker for visibility)
+        await this.drawVerticalLine(x, 0, fx, this.colors.current, 3, true);
         
         // Step 2: Draw point on function (after vertical line is complete)
         this.drawPoint(x, fx, this.colors.current, 6);
@@ -405,18 +410,12 @@ class GraphRenderer {
         
         // Step 3: Draw tangent line (animated)
         // Store current state (includes vertical line and point) as base for tangent animation
-        const baseForTangent = this.ctx.getImageData(0, 0, this.width, this.height);
+        const baseForTangent = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         
-        // Manually animate tangent line with correct base
+        // Manually animate tangent line with correct base (no tail - stops at x-axis)
         const xIntersect = x - fx / fpx;
         const pointOnFunction = this.worldToCanvas(x, fx);
         const pointOnAxis = this.worldToCanvas(xIntersect, 0);
-        const dx = pointOnAxis.x - pointOnFunction.x;
-        const dy = pointOnAxis.y - pointOnFunction.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const extend = 50;
-        const endX = pointOnFunction.x + (dx / length) * (length + extend);
-        const endY = pointOnFunction.y + (dy / length) * (length + extend);
         
         const duration = 500 * speedMultiplier;
         const startTime = performance.now();
@@ -428,12 +427,13 @@ class GraphRenderer {
                 
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                const currentX = pointOnFunction.x + (endX - pointOnFunction.x) * progress;
-                const currentY = pointOnFunction.y + (endY - pointOnFunction.y) * progress;
+                // Animate from point on function to x-axis intersection (no tail)
+                const currentX = pointOnFunction.x + (pointOnAxis.x - pointOnFunction.x) * progress;
+                const currentY = pointOnFunction.y + (pointOnAxis.y - pointOnFunction.y) * progress;
                 
-                // Draw animated tangent line
+                // Draw animated tangent line (thicker and more prominent for current iteration)
                 this.ctx.strokeStyle = this.colors.current;
-                this.ctx.lineWidth = 2;
+                this.ctx.lineWidth = 3; // Increased from 2 to make it more visible
                 this.ctx.setLineDash([5, 5]);
                 this.ctx.beginPath();
                 this.ctx.moveTo(pointOnFunction.x, pointOnFunction.y);
