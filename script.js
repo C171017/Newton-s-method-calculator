@@ -656,8 +656,130 @@ class NewtonCalculator {
         }
     }
 
-    // Numerical derivative using central difference method
+    // Convert function string to Math.js compatible format
+    convertToMathJS(funcStr) {
+        try {
+            let expr = funcStr.trim().replace(/\s+/g, '');
+            
+            // Handle log(b, x) -> log(x, b) for Math.js (must be done before other conversions)
+            // Math.js uses log(x, base) format, but user input is log(base, x)
+            const logBaseRegex = /log\(/g;
+            let logMatch;
+            const logReplacements = [];
+            
+            // Find all log( occurrences and check if they have two arguments
+            while ((logMatch = logBaseRegex.exec(expr)) !== null) {
+                const startPos = logMatch.index;
+                let pos = startPos + 4; // After "log("
+                let depth = 1;
+                let base = '';
+                let arg = '';
+                let currentPart = 'base';
+                
+                // Parse the arguments by tracking parentheses
+                while (pos < expr.length && depth > 0) {
+                    const char = expr[pos];
+                    if (char === '(') {
+                        depth++;
+                        if (currentPart === 'base') base += char;
+                        else arg += char;
+                    } else if (char === ')') {
+                        depth--;
+                        if (depth === 0) {
+                            break;
+                        } else {
+                            if (currentPart === 'base') base += char;
+                            else arg += char;
+                        }
+                    } else if (char === ',' && depth === 1 && currentPart === 'base') {
+                        currentPart = 'arg';
+                    } else {
+                        if (currentPart === 'base') base += char;
+                        else arg += char;
+                    }
+                    pos++;
+                }
+                
+                if (currentPart === 'arg' && arg) {
+                    // This is log(base, arg), convert to log(arg, base) for Math.js
+                    logReplacements.push({
+                        start: startPos,
+                        end: pos,
+                        replacement: `log(${arg}, ${base})`
+                    });
+                }
+            }
+            
+            // Apply log replacements from right to left to preserve indices
+            logReplacements.sort((a, b) => b.start - a.start);
+            logReplacements.forEach(replacement => {
+                expr = expr.substring(0, replacement.start) + 
+                       replacement.replacement + 
+                       expr.substring(replacement.end);
+            });
+            
+            // Handle implicit multiplication (same as parseFunction)
+            // Number followed by x: 2x -> 2*x
+            expr = expr.replace(/(\d)([x])/g, '$1*$2');
+            // x followed by number: x2 -> x*2
+            expr = expr.replace(/([x])(\d)/g, '$1*$2');
+            // Number/x followed by opening parenthesis: 2( or x( -> 2*( or x*(
+            expr = expr.replace(/(\d|x)(\()/g, '$1*$2');
+            // Closing parenthesis followed by number/x/opening parenthesis: )2 or )x or )( -> )*2 or )*x or )*(
+            expr = expr.replace(/(\))(\d|x|\()/g, '$1*$2');
+            
+            // Convert ln to log (natural log for Math.js) - must be before Math.xxx conversion
+            expr = expr.replace(/\bln\(/gi, 'log(');
+            
+            // Convert standalone function names to lowercase (Math.js format)
+            // Handle sin, cos, tan, log, sqrt, abs, exp (case-insensitive)
+            expr = expr.replace(/\b(sin|cos|tan|sqrt|abs|exp)\(/gi, (match, func) => {
+                return `${func.toLowerCase()}(`;
+            });
+            
+            // Convert Math.xxx to lowercase (Math.js format)
+            expr = expr.replace(/Math\.(sin|cos|tan|log|ln|sqrt|abs|exp)\(/gi, (match, func) => {
+                const lowerFunc = func.toLowerCase();
+                // ln -> log for Math.js (natural log)
+                return lowerFunc === 'ln' ? 'log(' : `${lowerFunc}(`;
+            });
+            
+            // Convert constants
+            expr = expr.replace(/Math\.PI/gi, 'pi');
+            expr = expr.replace(/Math\.E(?![a-z])/gi, 'e');
+            
+            return expr;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // Derivative - uses Math.js for symbolic differentiation, falls back to numerical
     derivative(funcStr, x, h = 1e-7) {
+        // Try Math.js symbolic differentiation first
+        if (typeof math !== 'undefined' && math.derivative) {
+            try {
+                // Convert function string to Math.js format
+                const mathJSExpr = this.convertToMathJS(funcStr);
+                if (mathJSExpr) {
+                    // Compute symbolic derivative
+                    const derivativeExpr = math.derivative(mathJSExpr, 'x');
+                    
+                    // Evaluate the derivative at point x
+                    const deriv = derivativeExpr.evaluate({ x: x });
+                    
+                    // Check if result is finite
+                    if (isFinite(deriv)) {
+                        return deriv;
+                    }
+                }
+            } catch (error) {
+                // If Math.js fails, fall back to numerical method
+                console.log('Math.js derivative failed, falling back to numerical:', error.message);
+            }
+        }
+        
+        // Fall back to numerical derivative using central difference method
         try {
             const f_plus = this.parseFunction(funcStr, x + h);
             const f_minus = this.parseFunction(funcStr, x - h);
