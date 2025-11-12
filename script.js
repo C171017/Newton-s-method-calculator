@@ -19,12 +19,13 @@ class GraphRenderer {
         // Scale context to match device pixel ratio
         this.ctx.scale(this.dpr, this.dpr);
         
-        // Set CSS size to logical size (so it displays at the same size)
-        this.canvas.style.width = this.width + 'px';
-        this.canvas.style.height = this.height + 'px';
+        // Set CSS size to logical size (responsive - width is handled by CSS, height by aspect-ratio)
+        this.canvas.style.width = '100%';
+        this.canvas.style.maxWidth = this.width + 'px';
+        // Height is controlled by CSS aspect-ratio for responsive design
         
-        // Padding for axis labels
-        this.padding = 60;
+        // Padding for axis labels (reduced to maximize graph area)
+        this.padding = 35;
         
         // Coordinate bounds
         this.xMin = -10;
@@ -182,9 +183,9 @@ class GraphRenderer {
         this.ctx.lineTo(yAxisX, this.height - this.padding);
         this.ctx.stroke();
         
-        // Axis labels
+        // Axis labels (smaller font and tighter spacing to maximize graph area)
         this.ctx.fillStyle = this.colors.axes;
-        this.ctx.font = '12px sans-serif';
+        this.ctx.font = '10px sans-serif';
         this.ctx.textAlign = 'center';
         
         // X-axis labels
@@ -192,7 +193,7 @@ class GraphRenderer {
         for (let x = Math.ceil(this.xMin / xStep) * xStep; x <= this.xMax; x += xStep) {
             if (Math.abs(x) > 0.01) {
                 const canvasX = this.worldToCanvas(x, 0).x;
-                this.ctx.fillText(x.toFixed(1), canvasX, xAxisY + 20);
+                this.ctx.fillText(x.toFixed(1), canvasX, xAxisY + 15);
             }
         }
         
@@ -202,7 +203,7 @@ class GraphRenderer {
         for (let y = Math.ceil(this.yMin / yStep) * yStep; y <= this.yMax; y += yStep) {
             if (Math.abs(y) > 0.01) {
                 const canvasY = this.worldToCanvas(0, y).y;
-                this.ctx.fillText(y.toFixed(1), yAxisX - 10, canvasY + 4);
+                this.ctx.fillText(y.toFixed(1), yAxisX - 8, canvasY + 3);
             }
         }
     }
