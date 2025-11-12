@@ -673,8 +673,8 @@ class NewtonCalculator {
                 return NaN;
             }
             
-            // Round to 10 decimal points
-            return Math.round(deriv * 1e10) / 1e10;
+            // Return raw derivative (no rounding - preserve full precision)
+            return deriv;
         } catch (error) {
             // If calculation fails, return NaN
             return NaN;
@@ -714,7 +714,7 @@ class NewtonCalculator {
 
                 // Check if derivative is too close to zero
                 if (Math.abs(fpx) < 1e-10) {
-                    error = 'Derivative too close to zero. Try a different starting point.';
+                    error = `Derivative too close to zero at iteration ${i} (x = ${this.formatNumber(x)}, f'(x) = ${this.formatNumber(fpx)}). The derivative became too small during iteration, not necessarily due to the starting point.`;
                     results[results.length - 1].error = error;
                     break;
                 }
@@ -727,8 +727,7 @@ class NewtonCalculator {
                 // Newton's method formula: x_n+1 = x_n - f(x_n) / f'(x_n)
                 if (i < maxIterations) {
                     x = x - fx / fpx;
-                    // Round to 10 decimal points to avoid floating point errors
-                    x = Math.round(x * 1e10) / 1e10;
+                    // No rounding - preserve full precision for calculations
                     
                     // Check for NaN or Infinity
                     if (!isFinite(x)) {
@@ -761,10 +760,28 @@ class NewtonCalculator {
 
     // Format number for display
     formatNumber(num, decimals = 10) {
-        if (Math.abs(num) < 1e-10) return '0';
-        // Always format with fixed decimal places, limit to 10 decimal points
-        const rounded = Number(num.toFixed(decimals));
-        return rounded.toString();
+        // Check if number is effectively zero
+        if (Math.abs(num) < 1e-15) return '0';
+        
+        // Round to 10 decimal places (rounds only the last digit)
+        const rounded = num.toFixed(decimals);
+        const roundedNum = Number(rounded);
+        
+        // If rounding to 10 decimal places made it exactly 0 but original was non-zero,
+        // it means the number is very small. Show it with more precision instead of rounding to 0.
+        if (roundedNum === 0 && Math.abs(num) >= 1e-15) {
+            // For very small non-zero numbers, show with enough precision to see it's not zero
+            // Find how many decimal places needed to show at least one non-zero digit
+            const absNum = Math.abs(num);
+            let precision = decimals;
+            while (precision < 20 && Math.abs(Number(num.toFixed(precision))) === 0) {
+                precision++;
+            }
+            return num.toFixed(precision).replace(/\.?0+$/, '');
+        }
+        
+        // Remove trailing zeros but keep the rounded value
+        return roundedNum.toString();
     }
 
     // Display results in table with animation
@@ -782,9 +799,15 @@ class NewtonCalculator {
         this.finalValueSpan.textContent = '...';
         this.iterationsUsedSpan.textContent = '...';
 
-        // Get animation speed from slider (1=slow, 2=medium, 3=fast)
+        // Get animation speed from slider (1=very slow, 2=slow, 3=medium, 4=fast, 5=very fast)
         const speedSetting = parseInt(this.animationSpeedInput.value);
-        const speedMultiplier = speedSetting === 1 ? 1.5 : speedSetting === 2 ? 1 : 0.4;
+        // Speed multipliers: lower value = faster animation
+        // Default (medium) is now 50% faster than before (0.67 instead of 1.0)
+        const speedMultiplier = speedSetting === 1 ? 2.0 :      // Very Slow
+                               speedSetting === 2 ? 1.5 :        // Slow
+                               speedSetting === 3 ? 0.67 :       // Medium (50% faster default)
+                               speedSetting === 4 ? 0.4 :        // Fast
+                               0.2;                              // Very Fast
         
         // Calculate graph bounds (only for valid results)
         const validResults = results.filter(r => !r.error && isFinite(r.fx) && isFinite(r.fpx));
