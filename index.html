@@ -24,10 +24,10 @@
                     <input 
                         type="text" 
                         id="function" 
-                        placeholder="e.g., x^2 - 4, sin(x) - 0.5, log(x) - 2, log(10, x) - 1"
+                        placeholder="e.g., x^2 - 4, sin(x) - 0.5, arcsin(x) - 0.5, log(x) - 2, log(10, x) - 1"
                         value="x^2 - 4">
                     <small class="help-text">
-                        Supported: +, -, *, /, ^, sin(), cos(), tan(), log() or ln() (natural log), log(b, x) (log base b), sqrt(), abs(), exp()
+                        Supported: +, -, *, /, ^, sin(), cos(), tan(), arcsin()/asin(), arccos()/acos(), arctan()/atan(), atan2(), log() or ln() (natural log), log(b, x) (log base b), sqrt(), abs(), exp()
                     </small>
                 </div>
 
@@ -139,6 +139,14 @@
                     <li><code>sin(x)</code> - sine</li>
                     <li><code>cos(x)</code> - cosine</li>
                     <li><code>tan(x)</code> - tangent</li>
+                </ul>
+                
+                <h4>Inverse Trigonometric Functions:</h4>
+                <ul>
+                    <li><code>arcsin(x)</code> or <code>asin(x)</code> - arcsine (inverse sine), input must be in [-1, 1]</li>
+                    <li><code>arccos(x)</code> or <code>acos(x)</code> - arccosine (inverse cosine), input must be in [-1, 1]</li>
+                    <li><code>arctan(x)</code> or <code>atan(x)</code> - arctangent (inverse tangent)</li>
+                    <li><code>atan2(y, x)</code> - arctangent of y/x (returns angle in correct quadrant)</li>
                 </ul>
                 
                 <h4>Logarithmic Functions:</h4>

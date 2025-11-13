@@ -575,6 +575,14 @@ class NewtonCalculator {
                 .replace(/sin\(/g, 'Math.sin(')
                 .replace(/cos\(/g, 'Math.cos(')
                 .replace(/tan\(/g, 'Math.tan(')
+                // Inverse trigonometric functions
+                .replace(/\barcsin\(/gi, 'Math.asin(')
+                .replace(/\basin\(/gi, 'Math.asin(')
+                .replace(/\barccos\(/gi, 'Math.acos(')
+                .replace(/\bacos\(/gi, 'Math.acos(')
+                .replace(/\barctan\(/gi, 'Math.atan(')
+                .replace(/\batan\(/gi, 'Math.atan(')
+                .replace(/\batan2\(/gi, 'Math.atan2(')
                 .replace(/sqrt\(/g, 'Math.sqrt(')
                 .replace(/abs\(/g, 'Math.abs(')
                 .replace(/exp\(/g, 'Math.exp(')
@@ -732,13 +740,18 @@ class NewtonCalculator {
             expr = expr.replace(/\bln\(/gi, 'log(');
             
             // Convert standalone function names to lowercase (Math.js format)
-            // Handle sin, cos, tan, log, sqrt, abs, exp (case-insensitive)
-            expr = expr.replace(/\b(sin|cos|tan|sqrt|abs|exp)\(/gi, (match, func) => {
-                return `${func.toLowerCase()}(`;
+            // Handle sin, cos, tan, log, sqrt, abs, exp, and inverse trig functions (case-insensitive)
+            expr = expr.replace(/\b(sin|cos|tan|sqrt|abs|exp|arcsin|asin|arccos|acos|arctan|atan|atan2)\(/gi, (match, func) => {
+                // Convert arcsin/asin to asin, arccos/acos to acos, arctan/atan to atan
+                const normalized = func.toLowerCase()
+                    .replace(/^arcsin$|^asin$/, 'asin')
+                    .replace(/^arccos$|^acos$/, 'acos')
+                    .replace(/^arctan$|^atan$/, 'atan');
+                return `${normalized}(`;
             });
             
             // Convert Math.xxx to lowercase (Math.js format)
-            expr = expr.replace(/Math\.(sin|cos|tan|log|ln|sqrt|abs|exp)\(/gi, (match, func) => {
+            expr = expr.replace(/Math\.(sin|cos|tan|log|ln|sqrt|abs|exp|asin|acos|atan|atan2)\(/gi, (match, func) => {
                 const lowerFunc = func.toLowerCase();
                 // ln -> log for Math.js (natural log)
                 return lowerFunc === 'ln' ? 'log(' : `${lowerFunc}(`;
