@@ -907,6 +907,145 @@ class NewtonCalculator {
         return roundedNum.toString();
     }
 
+    // Convert decimal to fraction representation using continued fractions
+    decimalToFraction(num, maxDenominator = 1000, tolerance = 1e-10) {
+        if (Math.abs(num) < 1e-15) return null; // Zero doesn't need fraction
+        
+        const sign = num < 0 ? -1 : 1;
+        const absNum = Math.abs(num);
+        
+        // Check if it's already an integer
+        if (Math.abs(absNum - Math.round(absNum)) < tolerance) {
+            return null; // Integer, no fraction needed
+        }
+        
+        // Try simple fractions for common cases first (higher priority)
+        const commonFractions = [
+            [1, 2], [1, 3], [2, 3], [1, 4], [3, 4],
+            [1, 5], [2, 5], [3, 5], [4, 5], [1, 6],
+            [5, 6], [1, 7], [2, 7], [3, 7], [4, 7],
+            [5, 7], [6, 7], [1, 8], [3, 8], [5, 8],
+            [7, 8], [1, 9], [2, 9], [4, 9], [5, 9],
+            [7, 9], [8, 9], [1, 10], [3, 10], [7, 10], [9, 10],
+            [1, 11], [2, 11], [3, 11], [4, 11], [5, 11], [6, 11],
+            [7, 11], [8, 11], [9, 11], [10, 11],
+            [1, 12], [5, 12], [7, 12], [11, 12],
+            [1, 13], [2, 13], [3, 13], [4, 13], [5, 13], [6, 13],
+            [7, 13], [8, 13], [9, 13], [10, 13], [11, 13], [12, 13]
+        ];
+        
+        for (const [numPart, denPart] of commonFractions) {
+            const fractionValue = numPart / denPart;
+            if (Math.abs(absNum - fractionValue) < tolerance) {
+                return `${sign * numPart}/${denPart}`;
+            }
+        }
+        
+        // Use continued fractions to find best approximation
+        let wholePart = Math.floor(absNum);
+        let fractionalPart = absNum - wholePart;
+        
+        if (fractionalPart < tolerance) {
+            return null; // Essentially an integer
+        }
+        
+        // Continued fraction algorithm for fractional part
+        let alpha = fractionalPart;
+        let hPrev = 1, hCurr = 0;
+        let kPrev = 0, kCurr = 1;
+        
+        let bestNum = null;
+        let bestDen = null;
+        let bestError = Infinity;
+        
+        for (let i = 0; i < 20; i++) {
+            if (alpha < tolerance) break;
+            
+            alpha = 1 / alpha;
+            const a = Math.floor(alpha);
+            alpha = alpha - a;
+            
+            const hNext = a * hCurr + hPrev;
+            const kNext = a * kCurr + kPrev;
+            
+            if (kNext > maxDenominator) break;
+            
+            // Calculate the full fraction including whole part
+            const fullNum = wholePart * kNext + hNext;
+            const approx = fullNum / kNext;
+            const error = Math.abs(absNum - approx);
+            
+            if (error < bestError) {
+                bestError = error;
+                bestNum = fullNum;
+                bestDen = kNext;
+            }
+            
+            if (error < tolerance) {
+                // Found exact match
+                const numerator = sign * bestNum;
+                const denominator = bestDen;
+                
+                // Simplify the fraction
+                const gcd = this.gcd(Math.abs(numerator), denominator);
+                const simplifiedNum = numerator / gcd;
+                const simplifiedDen = denominator / gcd;
+                
+                // Only return if denominator is reasonable
+                if (simplifiedDen <= maxDenominator && simplifiedDen > 1) {
+                    return `${simplifiedNum}/${simplifiedDen}`;
+                }
+                break;
+            }
+            
+            hPrev = hCurr;
+            kPrev = kCurr;
+            hCurr = hNext;
+            kCurr = kNext;
+        }
+        
+        // If we found a good approximation, use it
+        if (bestNum !== null && bestError < 1e-8) {
+            const numerator = sign * bestNum;
+            const denominator = bestDen;
+            
+            // Simplify the fraction
+            const gcd = this.gcd(Math.abs(numerator), denominator);
+            const simplifiedNum = numerator / gcd;
+            const simplifiedDen = denominator / gcd;
+            
+            // Only return if denominator is reasonable and not too large
+            if (simplifiedDen <= maxDenominator && simplifiedDen > 1 && simplifiedDen <= 1000) {
+                return `${simplifiedNum}/${simplifiedDen}`;
+            }
+        }
+        
+        return null;
+    }
+    
+    // Greatest Common Divisor (Euclidean algorithm)
+    gcd(a, b) {
+        a = Math.abs(a);
+        b = Math.abs(b);
+        while (b !== 0) {
+            const temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+
+    // Format number with fraction representation if applicable
+    formatNumberWithFraction(num, decimals = 10) {
+        const decimalStr = this.formatNumber(num, decimals);
+        const fraction = this.decimalToFraction(num);
+        
+        if (fraction) {
+            return `${decimalStr} (${fraction})`;
+        }
+        return decimalStr;
+    }
+
     // Display results in table with animation
     async displayResults(results, funcStr, x0, error = null) {
         // Clear previous results
@@ -1029,11 +1168,12 @@ class NewtonCalculator {
                 }
                 
                 // Format values, showing "Error" or "NaN" for invalid values
+                // Include fraction representation if available
                 const formatValue = (val) => {
                     if (!isFinite(val)) {
                         return isErrorRow ? 'Error' : 'NaN';
                     }
-                    return this.formatNumber(val);
+                    return this.formatNumberWithFraction(val);
                 };
                 
                 row.innerHTML = `
